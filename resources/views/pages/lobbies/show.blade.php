@@ -54,6 +54,9 @@
                     <div class="card-body">
                         <canvas id="drawingArea" class="w-100" style="height: 40rem !important;"></canvas>
                     </div>
+                    <div class="card-footer">
+                        <p>Retrace mode SVG's proviced by Freepik</p>
+                    </div>
                 </div>
             </div>
         </div>
