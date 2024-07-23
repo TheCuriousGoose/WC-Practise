@@ -23,6 +23,9 @@
                             <div class="col-2 d-flex justify-content-center ms-auto">
                                 {{ count($lobby->players) }} / {{ $lobby->max_players }}
                             </div>
+                            <div class="col-2">
+                                {{ $lobby->gamemode }}
+                            </div>
                             <div class="col-auto d-flex align-items-center">
                                 <a class="btn btn-secondary"
                                     @if ($lobby->is_private) data-bs-toggle="modal"

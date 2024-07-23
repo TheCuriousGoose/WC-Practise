@@ -11,7 +11,7 @@ class PlayerHaveHadTurn extends Model
     use HasFactory;
 
     protected $fillable = [
-        'lobby_id', 'player_id'
+        'lobby_id', 'player_id', 'round'
     ];
 
     public function lobby(): BelongsTo

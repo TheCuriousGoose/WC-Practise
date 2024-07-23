@@ -15,11 +15,21 @@ class Lobby {
         this.turnCountdownElement = document.getElementById('turnCountdown');
         this.drawingCanvas = document.getElementById('drawingArea');
         this.csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        this.roundNumber = document.getElementById('round');
         this.drawingContext = this.drawingCanvas.getContext('2d');
         this.drawing = false;
 
+        this.copyGameLink = document.getElementById('copyGameLink');
+
+        this.overlay = document.getElementById('overlay');
+
         this.playerWithTurn = 0;
         this.playersLength = 0;
+        this.imageLoadedForRound = false; // Flag to track image loading
+
+        this.pollingInterval = null; // Store the interval ID
+
+        this.firstInitialDrawing = true;
 
         this.init();
     }
@@ -55,6 +65,21 @@ class Lobby {
         this.startButton.addEventListener('click', () => {
             this.startGame();
         });
+
+        this.copyGameLink.addEventListener('click', () => {
+            this.copyGameLinkToClipboard();
+        });
+    }
+
+    copyGameLinkToClipboard() {
+        const gameLink = window.location.href;
+        navigator.clipboard.writeText(gameLink)
+            .then(() => {
+                console.log('Game link copied to clipboard!');
+            })
+            .catch(err => {
+                console.error('Failed to copy game link: ', err);
+            });
     }
 
     submitUsername() {
@@ -94,9 +119,16 @@ class Lobby {
     }
 
     startPolling() {
-        setInterval(() => {
+        this.pollingInterval = setInterval(() => {
             this.checkForUpdates();
         }, 500);
+    }
+
+    stopPolling() {
+        if (this.pollingInterval) {
+            clearInterval(this.pollingInterval);
+            this.pollingInterval = null;
+        }
     }
 
     checkForUpdates() {
@@ -133,11 +165,51 @@ class Lobby {
         }).then(response => response.json());
     }
 
+    startGameEnd() {
+        this.stopPolling();
+        this.startButton.disabled = true;
+        this.startButton.innerHTML = 'Game Over';
+
+        this.showFinalImages();
+    }
+
+    showFinalImages() {
+        this.sendRequest('getImages', 'POST', {})
+            .then(images => {
+                this.overlay.classList.add('show');
+
+                this.loopThroughImages(images);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+    }
+
+    loopThroughImages(images) {
+        console.log(images);
+
+        let currentIndex = 0;
+        setInterval(() => {
+            if (images.length > 0) {
+                this.overlay.querySelector('img').src = images[currentIndex];
+                currentIndex = (currentIndex + 1) % images.length;
+            }
+        }, 3000);
+    }
+
     updateUI(data) {
         this.maxPlayersElement.innerHTML = data.max_players;
         this.wordToDrawElement.innerHTML = data.drawable_word;
 
-        if (data.status !== 'in_lobby') {
+        if (data.current_round > this.roundNumber.innerHTML) {
+            this.roundNumber.innerHTML = data.current_round;
+            this.imageLoadedForRound = false;
+        }
+
+        if (data.status === 'finished') {
+            this.startGameEnd();
+            return;
+        } else if (data.status !== 'in_lobby') {
             this.startButton.style.display = 'none';
         } else {
             this.startButton.style.display = 'block';
@@ -172,11 +244,24 @@ class Lobby {
                 this.playersLength = data.players.length;
             }
         }
+
+        if (!this.imageLoadedForRound && data.random_image != null) {
+            const image = new Image();
+            image.src = data.random_image;
+
+            image.onload = () => {
+                this.drawingContext.clearRect(0, 0, this.drawingCanvas.width, this.drawingCanvas.height);
+                this.drawingContext.drawImage(image, 0, 0, this.drawingCanvas.width, this.drawingCanvas.height);
+                this.imageLoadedForRound = true;
+            };
+        }
+
         this.renderDrawingOnCanvas(data.drawing_url);
     }
 
     renderDrawingOnCanvas(imageUrl) {
-        if (imageUrl && (this.playerWithTurn != this.playerId)) {
+        if (imageUrl && (this.playerWithTurn !== this.playerId)) {
+
             const image = new Image();
             image.src = imageUrl;
 
@@ -235,7 +320,6 @@ class Lobby {
                 this.endTurn();
             }
         }, 1000);
-
     }
 
     enableDrawing() {
@@ -262,7 +346,7 @@ class Lobby {
         image.src = canvasImage;
         image.onload = () => {
             this.drawingContext.drawImage(image, 0, 0);
-        }
+        };
     }
 
     startDrawing(e) {
@@ -289,9 +373,10 @@ class Lobby {
     }
 
     endTurn() {
-        this.disableDrawing();
 
         const drawingDataUrl = this.drawingCanvas.toDataURL('image/png');
+        this.disableDrawing();
+
         this.sendRequest('endTurn', 'POST', {
             player_id: this.playerId,
             drawing: drawingDataUrl

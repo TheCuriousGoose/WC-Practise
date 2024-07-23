@@ -47,7 +47,8 @@ class LobbyController extends Controller
             'name' => ['required', 'max:255'],
             'is_private' => ['nullable', 'boolean'],
             'gamemode' => ['required', 'in:' . implode(',', Gamemode::values())],
-            'max_players' => ['required', 'integer', 'min:2', 'max:10']
+            'max_players' => ['required', 'integer', 'min:2', 'max:10'],
+            'rounds' => ['required', 'integer', 'min:1', 'max:10'],
         ];
 
         if ($request->is_private) {
@@ -57,6 +58,7 @@ class LobbyController extends Controller
         $validated = $request->validate($validationFields);
         $validated['status'] = Status::IN_LOBBY->value;
         $validated['slug'] = Str::slug($validated['name']);
+        $validated['current_round'] = 1;
 
         $lobby = Lobby::create($validated);
 
@@ -107,14 +109,11 @@ class LobbyController extends Controller
 
     public function updates(Lobby $lobby, Request $request)
     {
+
         if ($request->has('drawing')) {
             $drawing = $request->input('drawing');
             $drawingData = str_replace('data:image/png;base64,', '', $drawing);
             $drawingData = str_replace(' ', '+', $drawingData);
-
-            if ($lobby->drawing_path) {
-                Storage::disk('public')->delete($lobby->drawing_path);
-            }
 
             $filePath = $lobby->id . '/' . uniqid() . '.png';
             Storage::disk('public')->put($filePath, base64_decode($drawingData));
@@ -122,20 +121,39 @@ class LobbyController extends Controller
             $lobby->update(['drawing_path' => $filePath]);
         }
 
+        $drawUrl = null;
+
+        if($lobby->drawing_path){
+            if($lobby->gamemode == Gamemode::RETRACE->value() && str_contains($lobby->drawing_path, 'svg')){
+                $drawUrl = $lobby->drawing_path;
+            }else {
+                $drawUrl = Storage::url($lobby->drawing_path);
+            }
+        }
+
+
         return response()->json([
             'players' => $lobby->players,
             'status' => $lobby->status,
+            'gamemode' => $lobby->gamemode,
             'max_players' => $lobby->max_players,
             'player_with_turn' => $lobby->player_id_has_turn,
             'drawable_word' => $lobby->drawable_word,
-            'drawing_url' => $lobby->drawing_path ? Storage::url($lobby->drawing_path) : null
+            'drawing_url' => $drawUrl,
+            'current_round' => $lobby->current_round,
+            'random_image' => $lobby->random_image
         ]);
     }
 
     public function startGame(Lobby $lobby)
     {
+        $randomImage = null;
+
         if ($lobby->gamemode == Gamemode::FREEHAND->value()) {
             $randomWord = $this->getRandomWord();
+        } else if ($lobby->gamemode == Gamemode::RETRACE->value()) {
+            $randomWord = '';
+            $randomImage = asset('imgs/retrace/' . rand(1, 10) . '.svg');
         }
 
         $lobby->load('players');
@@ -143,13 +161,15 @@ class LobbyController extends Controller
         $player = Player::where('lobby_id', $lobby->id)->inRandomOrder()->first();
 
         $lobby->playerHaveHadTurn()->create([
-            'player_id' => $player->id
+            'player_id' => $player->id,
+            'round' => $lobby->current_round
         ]);
 
         $lobby->update([
             'status' => Status::IN_GAME->value,
             'drawable_word' => $randomWord ?? null,
-            'player_id_has_turn' => $player->id
+            'player_id_has_turn' => $player->id,
+            'random_image' => $randomImage
         ]);
 
         return $this->updates($lobby, request());
@@ -170,40 +190,77 @@ class LobbyController extends Controller
 
         $lobby->load('players');
 
+        // Decode the drawing data and save it
         $drawingData = $request->input('drawing');
         $drawingData = str_replace('data:image/png;base64,', '', $drawingData);
         $drawingData = str_replace(' ', '+', $drawingData);
 
-        $filename = $lobby->id . '/drawing_' . time() . '.png';
-
+        $filename = $lobby->id . '/' . $lobby->player_id_has_turn . '/round' . $lobby->current_round . '.png';
         Storage::disk('public')->put($filename, base64_decode($drawingData));
 
         $playersHaveHadTurn = $lobby->playerHaveHadTurn->pluck('player_id')->toArray();
-        $player = Player::query()
+
+        $nextPlayer = Player::query()
             ->whereNotIn('id', $playersHaveHadTurn)
             ->where('lobby_id', $lobby->id)
             ->inRandomOrder()
             ->first();
 
-        if ($player != null) {
+        if ($nextPlayer !== null) {
+            // Assign the turn to the next player
             $lobby->playerHaveHadTurn()->create([
-                'player_id' => $player->id,
-                'drawing_filename' => $filename
+                'player_id' => $nextPlayer->id,
+                'round' => $lobby->current_round
             ]);
 
             $lobby->update([
-                'player_id_has_turn' => $player->id
+                'player_id_has_turn' => $nextPlayer->id
             ]);
 
-            return $this->updates($lobby, request());
+            return $this->updates($lobby, $request);
         }
 
         if (count($playersHaveHadTurn) === $lobby->max_players) {
-            $lobby->update(['status' => Status::FINISHED->value]);
+            if ($lobby->current_round + 1 <= $lobby->rounds) {
+                $lobby->update([
+                    'current_round' => $lobby->current_round + 1,
+                    'player_id_has_turn' => null,
+                    'drawable_word' => null,
+                    'drawing_path' => null
+                ]);
 
-            return $this->updates($lobby, request());
+                $playersHaveHadTurns = $lobby->playerHaveHadTurn;
+
+                foreach($playersHaveHadTurns as $playerHaveHadTurn){
+                    $playerHaveHadTurn->delete();
+                }
+
+                return $this->startGame($lobby);
+            } else {
+                // No more rounds left, finish the game
+                $lobby->update(['status' => Status::FINISHED->value]);
+            }
         }
 
-        return $this->updates($lobby, request());
+        return $this->updates($lobby, $request);
+    }
+
+    public function getImages(Lobby $lobby)
+    {
+        // Retrieve all files from the lobby's directory and its subdirectories
+        $files = Storage::disk('public')->allFiles($lobby->id);
+
+        $imageUrls = array_filter($files, function ($file) {
+            return str_contains($file, 'round');
+        });
+
+        $imgsToDelete = array_diff($files, $imageUrls);
+        Storage::disk('public')->delete($imgsToDelete);
+
+        $imageUrls = array_map(function ($file) {
+            return Storage::disk('public')->url($file);
+        }, $imageUrls);
+
+        return response()->json($imageUrls);
     }
 }

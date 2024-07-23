@@ -17,6 +17,8 @@
                 </div>
                 <x-inputs.radio id="gamemode" name="gamemode" label="Gamemode" :options="$gamemodes" />
                 <x-inputs.select id="max_players" name="max_players" label="Max players" :options="array_combine(range(2, 10), range(2, 10))" />
+                <x-inputs.select id="rounds" name="rounds" label="Rounds" :options="array_combine(range(1, 5), range(1, 5))" />
+
             </div>
             <div class="card-footer">
                 <button type="submit" class="btn btn-secondary">

@@ -20,7 +20,10 @@ class Lobby extends Model
         'password',
         'player_id_has_turn',
         'drawable_word',
-        'drawing_path'
+        'drawing_path',
+        'current_round',
+        'rounds',
+        'random_image'
     ];
 
     protected $casts = [

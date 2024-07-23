@@ -27,3 +27,6 @@ Route::post('lobbies/{lobby}/start', [LobbyController::class, 'startGame'])->nam
 
 // End turn route
 Route::post('lobbies/{lobby}/end-turn', [LobbyController::class, 'endTurn'])->name('lobbies.end-turn');
+
+// Game end get images
+Route::post('lobbies/{lobby}/get-images', [LobbyController::class, 'getImages'])->name('lobbies.get-images');
