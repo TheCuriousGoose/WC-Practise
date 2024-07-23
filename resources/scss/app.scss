@@ -1,0 +1,98 @@
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Righteous&display=swap');
+
+@import 'variables';
+@import 'bootstrap';
+
+body {
+    background-image: url('../../public/imgs/bg.svg');
+    background-position: -5rem -5rem;
+    background-size: 110%;
+
+    font-family: 'open sans', sans-serif;
+    color: $light;
+    font-size: 16px;
+}
+
+.fs-xxl {
+    font-size: 8rem;
+}
+
+.fs-lg {
+    font-size: 20px;
+    color: $light;
+}
+
+.fs-md {
+    color: $light;
+    font-size: 16px;
+}
+
+.fs-sm {
+    font-size: 12px;
+    color: #9FA8B3;
+}
+
+p {
+    margin-bottom: 0.25rem;
+}
+
+a:not(.btn) {
+    text-decoration: none;
+    font-weight: 600;
+    color: $light;
+
+    &:hover {
+        text-decoration: underline;
+        color: #FFF
+    }
+}
+
+h1,
+h2,
+h3 {
+    font-family: 'righteous', sans-serif;
+}
+
+h1 {
+    font-size: 36px;
+}
+
+h2 {
+    font-size: 24px;
+}
+
+h3 {
+    font-size: 18px;
+}
+
+.btn {
+    padding: 14px 13px;
+    border-radius: 5px;
+    box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.25);
+
+    &.btn-primary {
+        height: 53px;
+        background-color: $contrast;
+        font-size: 18px;
+
+        &:hover {
+            background-color: #650A1E;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.45);
+        }
+    }
+
+    &.btn-secondary {
+        height: 47px;
+        font-size: 14px;
+        background-color: $primary;
+
+        &:hover {
+            background-color: $secondary;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.25);
+        }
+    }
+}
+
+.unleash {
+    font-size: 2.3rem;
+}
