@@ -52,17 +52,22 @@ class LobbyController extends Controller
         ];
 
         if ($request->is_private) {
-            $validationFields['password'] = ['required', 'min:8'];
+            $validationFields['password'] = ['required'];
         }
 
         $validated = $request->validate($validationFields);
         $validated['status'] = Status::IN_LOBBY->value;
-        $validated['slug'] = Str::slug($validated['name']);
         $validated['current_round'] = 1;
 
         $lobby = Lobby::create($validated);
 
-        return redirect()->route('lobbies.show', $lobby);
+        $routeParameters = ['lobby' => $lobby];
+
+        if ($request->is_private) {
+            $routeParameters['password'] = $validated['password'];
+        }
+
+        return redirect()->route('lobbies.show', $routeParameters);
     }
 
     public function show(Lobby $lobby, Request $request)
@@ -130,7 +135,6 @@ class LobbyController extends Controller
                 $drawUrl = Storage::url($lobby->drawing_path);
             }
         }
-
 
         return response()->json([
             'players' => $lobby->players,

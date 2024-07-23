@@ -13,7 +13,7 @@
                 <x-inputs.text id="name" name="name" label="Name" extras="required" />
                 <x-inputs.checkbox id="is_private" :checked="true" name="is_private" label="Private game" />
                 <div id="password-container">
-                    <x-inputs.text id="password" name="password" label="Password" />
+                    <x-inputs.password id="password" name="password" label="Password" />
                 </div>
                 <x-inputs.radio id="gamemode" name="gamemode" label="Gamemode" :options="$gamemodes" />
                 <x-inputs.select id="max_players" name="max_players" label="Max players" :options="array_combine(range(2, 10), range(2, 10))" />

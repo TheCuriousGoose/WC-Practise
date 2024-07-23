@@ -12,7 +12,6 @@ class Lobby extends Model
 
     protected $fillable = [
         'name',
-        'slug',
         'is_private',
         'gamemode',
         'max_players',
